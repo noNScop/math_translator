@@ -1,0 +1,5 @@
+outs:
+- md5: 7c3a0fecff3006df70fbd0f499228069
+  size: 4837015
+  hash: md5
+  path: translations_output.jsonl
