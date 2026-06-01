@@ -6,7 +6,7 @@ import wandb
 from datasets import load_dataset
 from huggingface_hub import login
 from peft import LoraConfig, PeftModel, prepare_model_for_kbit_training
-from transformers import (  # type: ignore[attr-defined]
+from transformers import ( 
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
@@ -42,8 +42,7 @@ def to_translation_examples(examples: dict, system_prompt: str) -> dict:
         for label, source_text, translated_text in (("problem", p_en, p_pl), ("solution", s_en, s_pl)):
             prompts.append([
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"""Translate the following mathematical {label} 
-                                              from English to Polish:\n\n{source_text.strip()}"""},
+                {"role": "user", "content": f"Translate the following mathematical {label} from English to Polish:\n\n{source_text.strip()}"},
             ])
             completions.append([
                 {"role": "assistant", "content": translated_text.strip()},
@@ -103,8 +102,7 @@ if __name__ == "__main__":
     elif cfg.QUANTIZATION == "8b":
         print("Applying 8-bit quantization...")
         quant_config = BitsAndBytesConfig(
-            load_in_8bit=True,
-            bnb_8bit_compute_dtype=torch.bfloat16 if cfg.USE_BF16 else torch.float16,
+            load_in_8bit=True
         )
     else:
         print("No quantization. Loading in bf16." if cfg.USE_BF16 else "No quantization. Loading in fp16.")
@@ -116,13 +114,38 @@ if __name__ == "__main__":
     if processor.pad_token is None:
         processor.add_special_tokens({"pad_token": "[PAD]"})
 
+    # Set a default chat template if the model doesn't have one (common with test models)
+    if processor.chat_template is None:
+        print(f"Warning: Tokenizer for '{cfg.BASE_MODEL}' has no chat_template set. Using default Llama-style template.")
+        processor.chat_template = (
+            "{% if not add_generation_prompt is defined %}"
+            "{% set add_generation_prompt = false %}"
+            "{% endif %}"
+            "{% for message in messages %}"
+            "{% if message['role'] == 'system' %}"
+            "{{ message['content'] }}"
+            "{% elif message['role'] == 'user' %}"
+            "{{ '\n\nUser: ' + message['content'] + '\n\nAssistant:' }}"
+            "{% elif message['role'] == 'assistant' %}"
+            "{{ ' ' + message['content'] }}"
+            "{% endif %}"
+            "{% endfor %}"
+        )
+
     # 5. Base model
     # Pass torch_dtype explicitly when not quantizing to avoid fp32 default
-    model_kwargs: dict = {"device_map": "auto", "trust_remote_code": True}
+    model_kwargs: dict = {"trust_remote_code": True}
     if quant_config is not None:
         model_kwargs["quantization_config"] = quant_config
     else:
         model_kwargs["torch_dtype"] = torch.bfloat16 if cfg.USE_BF16 else torch.float16
+    
+    # Set device_map based on CUDA availability
+    if torch.cuda.is_available():
+        model_kwargs["device_map"] = "auto"
+    else:
+        # For CPU training, don't use device_map; let the model stay on CPU
+        print("Training on CPU. Model will be loaded on CPU.")
 
     base_model = AutoModelForCausalLM.from_pretrained(cfg.BASE_MODEL, **model_kwargs)
 
@@ -179,6 +202,7 @@ if __name__ == "__main__":
         packing=False,
         remove_unused_columns=False,
         dataloader_num_workers=cfg.DATALOADER_NUM_WORKERS,
+        dataloader_pin_memory=torch.cuda.is_available(),  # Only pin memory if GPU is available
         save_strategy="steps",
         save_steps=cfg.SAVE_STEPS,
         save_total_limit=cfg.SAVE_TOTAL_LIMIT,

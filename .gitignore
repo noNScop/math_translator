@@ -1,2 +1,5 @@
 .ipynb_checkpoints
 /data
+.env
+__pycache__
+.claude

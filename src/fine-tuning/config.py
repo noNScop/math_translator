@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import torch
 from dotenv import load_dotenv
 
-ROOT_PATH = Path(__file__).resolve().parents[1]
+ROOT_PATH = Path(__file__).resolve().parents[0]
 load_dotenv(ROOT_PATH / ".env", override=True)
 
 
@@ -20,10 +20,11 @@ class Config:
     QUANTIZATION: str = field(default_factory=lambda: os.getenv('QUANTIZATION', 'none').lower())
 
     # --- Model / Dataset ---
-    BASE_MODEL: str = "google/gemma-4-E4B-it"
+    BASE_MODEL: str = "google/gemma-4-E4B-it"  # replace with "meta/gemma-4-E4B-it" for actual training
     PROJECT_NAME: str = "gemma4-math-translation"
     HF_USER: str = "Igor-S-666"
     # Path to the local JSONL file with EN→PL translation pairs
+    # default_factory=lambda: str(Path(__file__).resolve().parents[2] / "data" / "translations_output.jsonl")
     DATASET_PATH: str = field(
         default_factory=lambda: str(Path(__file__).resolve().parents[2] / "data" / "translations_output.jsonl")
     )
@@ -47,33 +48,31 @@ class Config:
         """
     )
 
-    # --- Reproducibility ---
     SEED: int = 42
 
-    # --- Training: General ---
+    # Training hyperparameters:
     EPOCHS: int = 3
     BATCH_SIZE: int = 4               # safe default on H100 without quantization
     EVAL_BATCH_SIZE: int = 4
     SAVE_TOTAL_LIMIT: int = 3
     MAX_SEQUENCE_LENGTH: int = 4096
-    GRADIENT_ACCUMULATION_STEPS: int = 4  # effective batch = 4 * 4 = 16
+    GRADIENT_ACCUMULATION_STEPS: int = 4 
     DATALOADER_NUM_WORKERS: int = 4
 
-    # --- Training: LoRA ---
+    # LORA hyperparameters:
     LORA_R: int = 32
     LORA_DROPOUT: float = 0.05
-    # "all-linear" targets every linear projection automatically (recommended by tutorial)
     TARGET_MODULES: str = "all-linear"
 
-    # --- Training: Optimizer / Scheduler ---
+    # Optimizer & LR scheduler:
     LEARNING_RATE: float = 2e-4
     WARMUP_RATIO: float = 0.05
     LR_SCHEDULER_TYPE: str = "cosine"
     WEIGHT_DECAY: float = 0.001
     MAX_GRAD_NORM: float = 0.3
 
-    # --- Tracking & Validation ---
-    VAL_SPLIT: float = 0.1  # fraction of records held out for validation
+
+    VAL_SPLIT: float = 0.1 
     SAVE_STEPS: int = 200
     LOG_STEPS: int = 10
 
@@ -95,8 +94,14 @@ class Config:
         self.SAVE_DIR = f"./{self.PROJECT_RUN_NAME}"
         self.HUB_MODEL_NAME = f"{self.HF_USER}/{self.PROJECT_RUN_NAME}"
 
-        # paged_adamw_8bit is more memory-efficient under any quantization
-        self.OPTIMIZER = "paged_adamw_8bit" if self.QUANTIZATION in ("4b", "8b") else "paged_adamw_32bit"
+        # Use appropriate optimizer based on quantization and device
+        if torch.cuda.is_available():
+            # GPU: use bitsandbytes paged optimizers (memory-efficient)
+            self.OPTIMIZER = "paged_adamw_8bit" if self.QUANTIZATION in ("4b", "8b") else "paged_adamw_32bit"
+        else:
+            # CPU: use standard PyTorch optimizer
+            print("Warning: CUDA not available. Using CPU-compatible optimizer (adamw_torch)")
+            self.OPTIMIZER = "adamw_torch"
 
         # H100 is sm_90 (capability >= 8) and supports bfloat16 natively
         cap = torch.cuda.get_device_capability() if torch.cuda.is_available() else (0, 0)
