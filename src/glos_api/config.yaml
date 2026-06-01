@@ -4,7 +4,7 @@ paths:
   output: "./data/translations_output_v2.jsonl"
 
 translation:
-  num_examples: 100
+  num_examples: 110
 
 glossary:
   enabled: true
