@@ -2,15 +2,16 @@ import json
 from pathlib import Path
 
 import spacy
+from collections import defaultdict
 
 from api import call_llm
 from prompts import GLOSSARY_INSTRUCTIONS
 from config import CONFIG
 
+
 GLOSSARY_FILE = Path(
     CONFIG["paths"]["glossary"]
 )
-
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -43,6 +44,33 @@ def lemmatize(text):
 GLOSSARY = load_glossary()
 
 
+PHRASE_GLOSSARY = []
+
+for entry in GLOSSARY:
+
+    english = entry["english"]
+
+    bag = entry.get("bag_of_words", [])
+
+    if not bag:
+        continue
+
+    PHRASE_GLOSSARY.append(
+        {
+            "english": english,
+            "polish": entry["polish"],
+            "lemmas": set(word.lower() for word in bag),
+        }
+    )
+
+
+INVERTED_INDEX = defaultdict(set)
+
+for i, entry in enumerate(PHRASE_GLOSSARY):
+    for lemma in entry["lemmas"]:
+        INVERTED_INDEX[lemma].add(i)
+
+
 def inject_single_word_terms(text):
 
     doc = nlp(text)
@@ -57,7 +85,6 @@ def inject_single_word_terms(text):
 
         for entry in GLOSSARY:
 
-            # Determine whether the glossary entry is truly one word
             english_lemmas = lemmatize(entry["english"])
 
             if len(english_lemmas) != 1:
@@ -81,49 +108,45 @@ def inject_single_word_terms(text):
                     )
                 )
 
-    # Apply replacements from the end of the string backwards
     for start, end, tagged in reversed(replacements):
 
         result = result[:start] + tagged + result[end:]
 
     return result
 
-def extract_relevant_phrases(text, threshold=0.5):
+
+def extract_relevant_phrases(
+    text,
+    threshold=0.5
+):
 
     text_lemmas = set(lemmatize(text))
 
+  
+    candidate_ids = set()
+
+    for lemma in text_lemmas:
+        candidate_ids.update(INVERTED_INDEX.get(lemma, set()))
+
     relevant = []
 
-    for entry in GLOSSARY:
+    for idx in candidate_ids:
 
-        english = entry["english"]
+        entry = PHRASE_GLOSSARY[idx]
 
-        # skip single-word terms
-        if len(english.split()) <= 1:
-            continue
-
-        bag = entry.get("bag_of_words", [])
-
-        glossary_lemmas = (
-            set(word.lower() for word in bag)
-            if bag
-            else set(lemmatize(english))
-        )
-
-        if not glossary_lemmas:
-            continue
+        glossary_lemmas = entry["lemmas"]
 
         overlap = len(text_lemmas & glossary_lemmas)
 
         score = overlap / len(glossary_lemmas)
 
         if score >= threshold:
+
             relevant.append(
-                f'- {english} → {entry["polish"]}'
+                f'- {entry["english"]} → {entry["polish"]}'
             )
 
     return relevant
-
 
 
 def translate_with_glossary(
@@ -138,39 +161,26 @@ def translate_with_glossary(
 
     if use_glossary:
 
-        # inline XML for single words
-        processed_text = inject_single_word_terms(
-            processed_text
-        )
-
-        # phrase glossary block
         phrases = extract_relevant_phrases(
-            processed_text
+            processed_text,
+            threshold=CONFIG["glossary"]["phrase_match_threshold"]
         )
 
         if phrases:
-
             glossary_block = (
                 "\n\nRelevant glossary:\n"
                 + "\n".join(phrases)
             )
 
-    final_user_prompt = user_prompt_template.format(
-        text=processed_text
+    final_user_prompt = (
+        user_prompt_template.format(
+            text=processed_text
+        )
     )
 
-    final_user_prompt += glossary_block
-
-    effective_system_prompt = system_prompt
-
-    if use_glossary:
-        effective_system_prompt += "\n\n" + GLOSSARY_INSTRUCTIONS
-
-    #print("glossary instructionsssss",GLOSSARY_INSTRUCTIONS)
-    #print("system prompt",effective_system_prompt)
-    #print("user prompt",final_user_prompt)
-
+    #final_user_prompt += glossary_block
+    #print( final_user_prompt)
     return call_llm(
-        effective_system_prompt,
+        system_prompt,
         final_user_prompt
     )

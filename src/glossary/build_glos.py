@@ -14,7 +14,7 @@ INPUT_FILES = [
     ".\data\processed\source5.jsonl",
 ]
 
-OUTPUT_FILE = ".\data\processed\master_final_67.jsonl"
+OUTPUT_FILE = ".\data\processed\master_final_v2.jsonl"
 
 
 
@@ -30,7 +30,7 @@ def make_bow(entry):
     tokens = [
         token.lemma_
         for token in doc
-        if token.is_alpha and not token.is_stop and len(token) > 2
+        if token.is_alpha and len(token) > 1
     ]
     
     return sorted(set(tokens))

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from config import CONFIG
 from query_glos import translate_with_glossary
+import time
 
 
 
@@ -107,7 +108,7 @@ for i in range(
     task = data[i]
 
     try:
-
+        start = time.perf_counter()
         problem_pl = (
             translate_with_glossary(
                 text=task["problem"],
@@ -116,7 +117,10 @@ for i in range(
                 use_glossary=USE_GLOSSARY,
             )
         )
+        end = time.perf_counter()
+        print(f"LLM call took {end - start:.4f} seconds")
 
+        start = time.perf_counter()
         solution_pl = (
             translate_with_glossary(
                 text=task["solution"],
@@ -125,6 +129,8 @@ for i in range(
                 use_glossary=USE_GLOSSARY,
             )
         )
+        end = time.perf_counter()
+        print(f"LLM call took {end - start:.4f} seconds")
 
         save_translation(
             OUTPUT_FILE,
