@@ -1,14 +1,14 @@
 paths:
   dataset: "./data/ready_dataset.jsonl"
-  glossary: "./data/processed/master_final.jsonl"
-  output: "./data/translations_output_working.jsonl"
+  glossary: "./data/processed/master_final_v2.jsonl"
+  output: "./data/translations_output_v2.jsonl"
 
 translation:
-  num_examples: 6
+  num_examples: 100
 
 glossary:
   enabled: true
-  phrase_match_threshold: 0.7
+  phrase_match_threshold: 0.6
 
 api:
   temperature: 0.2

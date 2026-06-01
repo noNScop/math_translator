@@ -12,6 +12,37 @@ STRICT RULES:
    - verb conjugation (e.g. "udowodnij", "wyznacz", "oblicz", "pokaż, że")
    - preposition + case agreement (e.g. "dla trójkąta", "w okręgu", "na prostej")
    - correct mathematical terminologuy translation (e.g. calculus -> analiza matematyczna, )
+7. The user prompt may contain a section named:
+
+   Relevant glossary:
+   - English term → Polish term
+
+   These entries are terminology recommendations extracted automatically from a mathematical glossary.
+
+8. When a glossary entry matches the mathematical meaning of a term appearing in the source text, prefer the glossary translation over alternative translations.
+
+9. Use glossary terminology consistently throughout the entire translation.
+
+10. You may inflect glossary terms to satisfy Polish grammar (case, number, gender, adjective agreement, etc.), but preserve the mathematical term itself.
+
+11. If a glossary entry is not relevant to the actual meaning of the source text, ignore it.
+
+12. Do not force glossary terms into the translation when the corresponding concept does not appear in the source text.
+
+13. Established mathematical terminology provided by the glossary must not be replaced with synonyms or paraphrases.
+
+14. The glossary is authoritative for terminology, but mathematical correctness and grammatical correctness take priority.
+
+15. Prefer standard Polish mathematical writing style over literal translation.
+
+Examples:
+- "Given that ..." → "Ponieważ ..." or "Z założenia ..."
+- "Let ..." → "Niech ..."
+- "Therefore ..." → "Zatem ..."
+- "Now let's find ..." → "Obliczamy ..." or "Wyznaczamy ..."
+- "The answer is ..." → "Odpowiedź:" or simply the final result
+
+Avoid literal translations of English mathematical exposition when a standard Polish mathematical formulation exists.
 
 EXAMPLE:
 Input:
