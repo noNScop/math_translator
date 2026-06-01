@@ -21,6 +21,9 @@ mkdir -p "$SFT_DIR/logs"
 export HF_HOME="$PROJECT/hf_cache"
 mkdir -p "$HF_HOME"
 
+VENV_DIR="$PROJECT/venv"
+VENV_ACTIVATE="$VENV_DIR/bin/activate"
+
 if [ -f "$SFT_DIR/.env" ]; then
     echo "Loading environment variables from .env file..."
     set -a
@@ -30,14 +33,14 @@ else
     echo "WARNING: .env file not found. If the model is gated, it will fail."
 fi
 
-if [ ! -d "$PROJECT/venv" ]; then
-    echo "ERROR: venv environment does not exist."
+if [ ! -f "$VENV_ACTIVATE" ]; then
+    echo "ERROR: venv environment does not exist or is incomplete."
     echo "Please run setup.sh manually on the login node before submitting this job."
     exit 1
 fi
 
 echo "Activating venv..."
-source "$PROJECT/venv/bin/activate"
+source "$VENV_ACTIVATE"
 
 echo "Starting supervised fine-tuning..."
 python3 "$SFT_DIR/train.py"

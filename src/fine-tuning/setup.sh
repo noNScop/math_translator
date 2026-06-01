@@ -11,20 +11,23 @@ mkdir -p "$TMPDIR"
 mkdir -p "$PIP_CACHE_DIR"
 mkdir -p "$SFT_DIR/logs"
 
+VENV_DIR="$PROJECT/venv"
+VENV_ACTIVATE="$VENV_DIR/bin/activate"
+
 echo "Starting setup in directory: $PWD"
 echo "Using project directory: $PROJECT"
 
-if [ ! -d "$PROJECT/venv" ]; then
+if [ ! -f "$VENV_ACTIVATE" ]; then
     echo "No venv environment found. Creating a new one..."
-    python3 -m venv "$PROJECT/venv"
+    python3 -m venv "$VENV_DIR"
 else
     echo "venv environment already exists. Proceeding to update libraries..."
 fi
 
-source "$PROJECT/venv/bin/activate"
+source "$VENV_ACTIVATE"
 
 echo "Installing/Updating libraries (this may take a few minutes)..."
-pip install --upgrade pip
-pip install -r "$SFT_DIR/requirements.txt"
+python -m pip install --upgrade pip
+python -m pip install -r "$SFT_DIR/requirements.txt"
 
 echo "Setup complete."
