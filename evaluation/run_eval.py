@@ -47,13 +47,13 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--dataset", type=Path,
-        default=PROJECT_ROOT / "data" / "ready_dataset.jsonl",
-        help="Path to the source dataset JSONL",
+        default=PROJECT_ROOT / "data" / "translations_output.jsonl",
+        help="Path to the source dataset JSONL (supports both ready_dataset.jsonl and translations_output.jsonl formats)",
     )
     p.add_argument(
         "--local-model", type=str,
-        default=str(PROJECT_ROOT / "models" / "google" / "gemma-4-E4B-it"),
-        help="Path to local model directory, or 'none' to skip",
+        default="google/gemma-4-E4B-it",
+        help="Local path or HuggingFace Hub ID for base local model, or 'none' to skip",
     )
     p.add_argument(
         "--finetuned-model", type=str,
@@ -63,6 +63,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--translate-only", action="store_true",
         help="Only run translations (with timing), skip all metric computation",
+    )
+    p.add_argument(
+        "--skip-api", action="store_true",
+        help="Skip the API model (useful when no PCSS API key is available)",
+    )
+    p.add_argument(
+        "--start-from", type=int, default=0,
+        help="Start from this dataset index (default: 0)",
     )
     p.add_argument(
         "--run-comet", action="store_true",
@@ -83,17 +91,34 @@ def parse_args() -> argparse.Namespace:
 # Dataset
 # ---------------------------------------------------------------------------
 
-def load_dataset(path: Path, n: int) -> list[dict]:
+def _normalize_record(rec: dict) -> dict:
+    """Normalize translations_output.jsonl format to internal format.
+    translations_output.jsonl uses: id, problem_en, solution_en
+    ready_dataset.jsonl uses:       idx, problem, solution
+    """
+    if "problem_en" in rec:
+        rec["problem"] = rec.pop("problem_en")
+    if "solution_en" in rec:
+        rec["solution"] = rec.pop("solution_en")
+    if "id" in rec and "idx" not in rec:
+        rec["idx"] = rec.pop("id")
+    return rec
+
+
+def load_dataset(path: Path, n: int, start_from: int = 0) -> list[dict]:
     records = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            records.append(json.loads(line))
+            rec = _normalize_record(json.loads(line))
+            if rec["idx"] < start_from:
+                continue
+            records.append(rec)
             if len(records) >= n:
                 break
-    print(f"Loaded {len(records)} examples from {path}")
+    print(f"Loaded {len(records)} examples from {path} (starting from idx {start_from})")
     return records
 
 
@@ -352,7 +377,7 @@ def print_timing_table(timing: dict) -> None:
 
 def main() -> None:
     args = parse_args()
-    dataset = load_dataset(args.dataset, args.num_examples)
+    dataset = load_dataset(args.dataset, args.num_examples, args.start_from)
 
     def _model_available(s: str) -> bool:
         if s.lower() == "none":
@@ -375,19 +400,25 @@ def main() -> None:
 
     timing: dict[str, dict] = {}
 
-    # --- API model (always run) ---
-    print("\n=== API model ===")
-    problem_scores["api"]  = {}
-    solution_scores["api"] = {}
-    timing["api"] = {}
-    for use_glossary in [False, True]:
-        suffix = "glos" if use_glossary else "no_glos"
-        translations, avg_t = run_translations(dataset, f"api_{suffix}", use_glossary, llm_fn=None)
-        if not args.translate_only:
-            p, s = compute_metric_1(dataset, translations)
-            problem_scores["api"][suffix]  = p
-            solution_scores["api"][suffix] = s
-        timing["api"][suffix] = avg_t
+    # --- API model ---
+    if args.skip_api:
+        print("\n[INFO] Skipping API model (--skip-api)")
+        problem_scores["api"]  = {"no_glos": None, "glos": None}
+        solution_scores["api"] = {"no_glos": None, "glos": None}
+        timing["api"] = {"no_glos": None, "glos": None}
+    else:
+        print("\n=== API model ===")
+        problem_scores["api"]  = {}
+        solution_scores["api"] = {}
+        timing["api"] = {}
+        for use_glossary in [False, True]:
+            suffix = "glos" if use_glossary else "no_glos"
+            translations, avg_t = run_translations(dataset, f"api_{suffix}", use_glossary, llm_fn=None)
+            if not args.translate_only:
+                p, s = compute_metric_1(dataset, translations)
+                problem_scores["api"][suffix]  = p
+                solution_scores["api"][suffix] = s
+            timing["api"][suffix] = avg_t
 
     # --- Local model ---
     if use_local:
