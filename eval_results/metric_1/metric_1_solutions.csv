@@ -1,0 +1,4 @@
+Model,Without Glossary,With Glossary
+llama3.3:70b (API),100.0%,100.0%
+gemma-4-E4B-it (local),N/A,N/A
+gemma-4-E4B-it (finetuned),N/A,N/A

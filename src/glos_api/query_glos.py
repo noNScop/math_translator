@@ -153,7 +153,8 @@ def translate_with_glossary(
     text,
     system_prompt,
     user_prompt_template,
-    use_glossary=True
+    use_glossary=True,
+    llm_fn=None,
 ):
 
     processed_text = text
@@ -178,9 +179,9 @@ def translate_with_glossary(
         )
     )
 
-    #final_user_prompt += glossary_block
-    #print( final_user_prompt)
-    return call_llm(
+    final_user_prompt += glossary_block
+    fn = llm_fn if llm_fn is not None else call_llm
+    return fn(
         system_prompt,
         final_user_prompt
     )
