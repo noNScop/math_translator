@@ -18,6 +18,8 @@ import csv
 import json
 import sys
 import time
+import gc
+import torch
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -437,8 +439,10 @@ def main() -> None:
                 solution_scores["local"][suffix] = s
             timing["local"][suffix] = avg_t
         del local_wrapper
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
         try:
-            import torch
             torch.cuda.empty_cache()
         except Exception:
             pass
@@ -450,8 +454,8 @@ def main() -> None:
     # --- Finetuned model ---
     if use_finetuned:
         print("\n=== Finetuned model ===")
-        from translate import load_local_model
-        ft_wrapper = load_local_model(Path(args.finetuned_model))
+        from translate import load_finetuned_model
+        ft_wrapper = load_finetuned_model(Path(args.finetuned_model))
         problem_scores["finetuned"]  = {}
         solution_scores["finetuned"] = {}
         timing["finetuned"] = {}
@@ -464,8 +468,10 @@ def main() -> None:
                 solution_scores["finetuned"][suffix] = s
             timing["finetuned"][suffix] = avg_t
         del ft_wrapper
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
         try:
-            import torch
             torch.cuda.empty_cache()
         except Exception:
             pass

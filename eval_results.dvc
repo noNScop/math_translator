@@ -1,0 +1,6 @@
+outs:
+- md5: f5a50923cfbacc9020b93765430ac82d.dir
+  size: 2435194
+  nfiles: 4
+  hash: md5
+  path: eval_results

@@ -10,6 +10,7 @@ All backends go through translate_with_glossary so glossary injection is uniform
 """
 import sys
 from pathlib import Path
+from peft import PeftModel
 
 # Patch sys.path so bare imports inside src/glos_api resolve correctly.
 # Note: config.py inside glos_api opens "src/glos_api/config.yaml" relative to CWD,
@@ -76,11 +77,43 @@ class LocalModelWrapper:
             )
 
         return self.tokenizer.decode(outputs[0][input_len:], skip_special_tokens=True)
+    
+
+class FinetunedModelWrapper(LocalModelWrapper):
+    """Loads base model + PEFT adapter, merges and unloads for full-speed inference."""
+
+    def __init__(self, base_model_id: str, adapter_path: str | Path, max_new_tokens: int = 2048):
+        adapter_path = str(adapter_path)
+        print(f"Loading finetuned model (base={base_model_id}, adapter={adapter_path}) ...")
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
+
+        self.tokenizer = AutoTokenizer.from_pretrained(base_model_id)
+        self.tokenizer.padding_side = "left"
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        base = AutoModelForCausalLM.from_pretrained(
+            base_model_id,
+            quantization_config=bnb_config,
+            device_map="auto",
+        )
+        self.model = PeftModel.from_pretrained(base, adapter_path)
+        self.model.eval()
+        self.max_new_tokens = max_new_tokens
+        print("Finetuned model ready.")
 
 
 def load_local_model(model_path: Path) -> LocalModelWrapper:
     return LocalModelWrapper(model_path)
 
+BASE_MODEL_ID = "google/gemma-4-E4B-it"
+def load_finetuned_model(adapter_path: Path, base_model_id: str = BASE_MODEL_ID) -> FinetunedModelWrapper:
+    return FinetunedModelWrapper(base_model_id, adapter_path)
 
 def translate_item(
     problem_en: str,
