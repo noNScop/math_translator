@@ -77,8 +77,12 @@ def parse_args() -> argparse.Namespace:
         help="Skip the API model (useful when no PCSS API key is available)",
     )
     p.add_argument(
+        "--run-latex", action="store_true",
+        help="Run Metric 1: LaTeX preservation score",
+    )
+    p.add_argument(
         "--run-comet", action="store_true",
-        help="Run Metric 2: COMET QE score (requires pip install unbabel-comet)",
+        help="Run Metric 2: COMET QE score (requires venv_comet)",
     )
     p.add_argument(
         "--run-llm-judge", action="store_true",
@@ -414,14 +418,15 @@ def _compute_all_metrics(dataset: list[dict], args: argparse.Namespace) -> None:
         if load_cache(ck)
     }
 
-    # --- Metric 1 ---
-    m1: dict[str, dict[int, dict]] = {
-        ck: compute_metric_1(dataset, trans)
-        for ck, trans in all_translations.items()
-    }
-    _write_metric_jsonl(METRICS_DIR / "metric_1.jsonl", dataset, m1)
-    _print_table(_avg_ps(m1, "problem"),  "Metric 1 — LaTeX Preservation (problems, avg)",  _fmt_pct)
-    _print_table(_avg_ps(m1, "solution"), "Metric 1 — LaTeX Preservation (solutions, avg)", _fmt_pct)
+    # --- Metric 1: LaTeX preservation ---
+    if args.run_latex:
+        m1: dict[str, dict[int, dict]] = {
+            ck: compute_metric_1(dataset, trans)
+            for ck, trans in all_translations.items()
+        }
+        _write_metric_jsonl(METRICS_DIR / "metric_1.jsonl", dataset, m1)
+        _print_table(_avg_ps(m1, "problem"),  "Metric 1 — LaTeX Preservation (problems, avg)",  _fmt_pct)
+        _print_table(_avg_ps(m1, "solution"), "Metric 1 — LaTeX Preservation (solutions, avg)", _fmt_pct)
 
     # --- Metric 2: COMET ---
     if args.run_comet:
@@ -511,8 +516,8 @@ def main() -> None:
     # --- Finetuned model ---
     if use_finetuned:
         print("\n=== Finetuned model ===")
-        from translate import load_local_model
-        ft_wrapper = load_local_model(Path(args.finetuned_model))
+        from translate import load_finetuned_model
+        ft_wrapper = load_finetuned_model(Path(args.finetuned_model))
         for use_glossary in [False, True]:
             suffix = "glos" if use_glossary else "no_glos"
             ck = f"finetuned_{suffix}"

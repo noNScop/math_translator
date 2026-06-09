@@ -10,8 +10,16 @@ Install: pip install unbabel-comet
 
 def load_comet_model(model_name: str = "Unbabel/wmt22-cometkiwi-da"):
     from comet import download_model, load_from_checkpoint
+    from huggingface_hub.errors import GatedRepoError
     print(f"Loading COMET model {model_name} ...")
-    path = download_model(model_name)
+    try:
+        path = download_model(model_name)
+    except GatedRepoError:
+        raise SystemExit(
+            f"\n[ERROR] Access to {model_name} is restricted.\n"
+            f"Go to https://huggingface.co/{model_name} login and agree to terms of use',\n"
+            f""
+        )
     return load_from_checkpoint(path)
 
 

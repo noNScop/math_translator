@@ -6,3 +6,5 @@ __pycache__
 venv
 eval_results/
 /eval_results
+
+venv_comet
