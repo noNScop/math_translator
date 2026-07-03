@@ -1,3 +1,122 @@
+# Setup
+
+### Configure DVC remote credentials
+
+```bash
+dvc remote modify origin --local auth basic
+dvc remote modify origin --local user YOUR_DAGSHUB_USERNAME
+dvc remote modify origin --local password YOUR_DAGSHUB_TOKEN
+```
+
+Get your token from: DagsHub → Settings → Access Tokens
+
+### Pull the data
+
+```bash
+dvc pull
+```
+
+This downloads all DVC-tracked files into `data/raw/`.
+
+---
+
+## Project structure
+
+```
+├── .dvc/                         # DVC configuration
+├── data.dvc                      # DVC pointer for data/
+├── eval_results.dvc              # DVC pointer for eval_results/
+├── data/                         # datasets (tracked by DVC)
+│   ├── raw/                      # raw scraped data
+│   ├── processed/                # cleaned data + glossary sources (source1–5, master_final*)
+│   └── *.jsonl                   # translation outputs (ready_dataset, translations_output*)
+├── models/                       # trained models (tracked by DVC)
+├── src/                          # training and processing code
+│   ├── fine-tuning/              # SFT/LoRA training (train.py, config.py, run_training.sh, setup.sh)
+│   ├── glos_api/                 # glossary-augmented translation pipeline (pipeline.py, query_glos.py, prompts.py, api.py, config.yaml)
+│   ├── glossary/                 # glossary building (build_glos.py, glos_playground.ipynb)
+│   ├── dataset*.ipynb            # dataset creation & preprocessing notebooks
+│   ├── *_translation.ipynb       # api / baseline translation notebooks
+│   ├── translation_eval.ipynb    # translation evaluation notebook
+│   └── inspect_math_errors.ipynb
+├── evaluation/                   # evaluation harness
+│   ├── run_eval.py               # main entry point
+│   ├── translate.py              # model loading + translation
+│   ├── download_model.py
+│   ├── metrics/                  # metric implementations (latex_preservation, comet_score, llm_judge)
+│   └── visualisations/           # metric_0–3 plotting notebooks
+├── eval_results/                 # evaluation outputs (tracked by DVC — see section 5)
+├── assets/                       # images used in the report
+├── INSTRUCTIONS.md               # this file
+├── Report.md                     # project report
+└── README.md
+```
+
+---
+
+## Daily workflow
+
+### Make changes and reproduce the pipeline
+
+```bash
+# after modifying scripts or adding data
+dvc repro
+```
+
+### Push changes
+
+```bash
+dvc push          # push data/models to DagsHub
+git add .
+git commit -m "your message"
+git push
+```
+
+---
+
+## Adding new data
+
+1. Place the file in `data/raw/`
+2. Track it with DVC:
+
+```bash
+dvc add data/raw/your_file.csv
+```
+
+3. Commit and push:
+
+```bash
+git add data/raw/your_file.csv.dvc data/raw/.gitignore
+git commit -m "data: add your_file.csv"
+git push origin main
+dvc push
+```
+
+---
+
+## Running the pipeline
+
+> Pipeline stages will be defined in `dvc.yaml` as the project develops.
+
+Once defined, run the full pipeline with:
+
+```bash
+dvc repro
+```
+
+DVC will only re-run stages whose dependencies have changed.
+
+---
+
+## Notes
+
+- Never commit raw data files directly to Git — always use `dvc add`
+- `.dvc/config.local` holds your credentials and is gitignored by default
+
+
+
+![alt text](assets/image.png)
+
 # Evaluation — How to Run
 
 All commands must be run from the **project root** (`Trump_GPT/`).

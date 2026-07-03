@@ -1,96 +1,44 @@
 # Math Translator
 
-## Setup
+Finetuning a small multilingual model to translate math problems (with LaTeX) from **English to Polish** — cheaply, quickly, and at a quality close to much larger models.
 
-### Configure DVC remote credentials
+## What & why
 
-```bash
-dvc remote modify origin --local auth basic
-dvc remote modify origin --local user YOUR_DAGSHUB_USERNAME
-dvc remote modify origin --local password YOUR_DAGSHUB_TOKEN
-```
+We needed a large Polish math-translation dataset for a separate project (finetuning the Polish LLM **Bielik** on math benchmarks), but none existed. So we translated an existing English dataset (AI-MO, ~900k problems) into Polish.
 
-Get your token from: DagsHub → Settings → Access Tokens
+Large API models translated well but were too slow and expensive to run over the whole dataset; small local models were fast and cheap but low-quality. Our solution: **finetune `gemma-4-E4B-it` (LoRA, 3 epochs)** on 1000 examples pre-translated by `llama3.3:70b`, plus a **glossary system** that suggests correct Polish math terminology in the prompt.
 
-### Pull the data
+- **Finetuned model:** [Igor-S-666/gemma4-math-translation](https://huggingface.co/Igor-S-666/gemma4-math-translation-2026-06-02_10.36.07)
 
-```bash
-dvc pull
-```
+## Key results
 
-This downloads all DVC-tracked files into `data/raw/`.
+Evaluated on 300 held-out examples across 4 metrics (LaTeX preservation, COMET-Kiwi, LLM-as-judge, time):
 
----
+- Finetuning raised **LaTeX preservation from 50.7% → 89.0%** and closed most of the quality gap to the 70B "teacher" model.
+- The **glossary** gave a small but consistent boost on the LLM-judge metric, clearest for **terminology**.
+- Self-hosted, our finetuned model reaches comparable quality to commercial translation APIs at roughly **12× faster** and **5× cheaper**.
+
+### **Full details, tables, and plots are in [Report.md](Report.md)**.
+
 
 ## Project structure
 
 ```
-├── .dvc/             # DVC configuration
-├── data/
-│   └── raw/          # raw data, tracked by DVC
-├── models/           # trained models, tracked by DVC
-├── src/              # training and processing scripts
-├── dvc.yaml          # pipeline definition (added later)
-└── README.md
+├── data/          # datasets (DVC-tracked): raw, processed, glossary sources, translations
+├── models/        # trained models (DVC-tracked)
+├── src/           # data prep + training
+│   ├── fine-tuning/   # LoRA/SFT training scripts
+│   ├── glos_api/      # glossary-augmented translation pipeline
+│   └── glossary/      # glossary building
+├── evaluation/    # eval harness (run_eval.py), metrics, plotting notebooks
+├── eval_results/  # evaluation outputs (DVC-tracked)
+├── assets/        # images used in the report
+├── Report.md      # full project report
+└── INSTRUCTIONS.md # setup + how to run
 ```
 
----
+## Getting started
 
-## Daily workflow
+Setup, DVC data pull, and how to run training and evaluation are documented in **[INSTRUCTIONS.md](INSTRUCTIONS.md)**.
 
-### Make changes and reproduce the pipeline
 
-```bash
-# after modifying scripts or adding data
-dvc repro
-```
-
-### Push changes
-
-```bash
-dvc push          # push data/models to DagsHub
-git add .
-git commit -m "your message"
-git push
-```
-
----
-
-## Adding new data
-
-1. Place the file in `data/raw/`
-2. Track it with DVC:
-
-```bash
-dvc add data/raw/your_file.csv
-```
-
-3. Commit and push:
-
-```bash
-git add data/raw/your_file.csv.dvc data/raw/.gitignore
-git commit -m "data: add your_file.csv"
-git push origin main
-dvc push
-```
-
----
-
-## Running the pipeline
-
-> Pipeline stages will be defined in `dvc.yaml` as the project develops.
-
-Once defined, run the full pipeline with:
-
-```bash
-dvc repro
-```
-
-DVC will only re-run stages whose dependencies have changed.
-
----
-
-## Notes
-
-- Never commit raw data files directly to Git — always use `dvc add`
-- `.dvc/config.local` holds your credentials and is gitignored by default
